@@ -22,6 +22,7 @@ import { formatBytes, getKindLabel, getViewerHint, makeAppFile } from './src/lib
 import {
   addRecent,
   createNote,
+  exportImageToPdf,
   exportTextAsFile,
   exportTextToDocx,
   exportTextToPdf,
@@ -43,7 +44,16 @@ import {
   makePreview,
 } from './src/lib/markdown';
 import { PdfPreview } from './src/components/PdfPreview';
-import { addTextStampToPdf, extractPdfPages, mergePdfFiles, removePdfPage } from './src/lib/pdfTools';
+import {
+  addHighlightToPdf,
+  addTextStampToPdf,
+  extractPdfPages,
+  mergePdfFiles,
+  movePdfPage,
+  removePdfPage,
+  rotatePdfPage,
+  splitPdfToZip,
+} from './src/lib/pdfTools';
 import { buildVaultIndex, filterVaultFiles, type VaultIndex } from './src/lib/vault';
 
 type Notice = { tone: 'info' | 'error' | 'success'; text: string } | null;
@@ -251,13 +261,13 @@ export default function App() {
   async function handleExportPdf() {
     if (!activeFile) return;
     const content = editorText || activeFile.textContent || '';
-    if (!activeFile.isTextLike && activeFile.kind !== 'docx') {
-      setNotice({ tone: 'error', text: 'PDF export is ready for text, markdown, code, and extracted DOCX text first.' });
+    if (!activeFile.isTextLike && activeFile.kind !== 'docx' && activeFile.kind !== 'image') {
+      setNotice({ tone: 'error', text: 'PDF export is ready for text, markdown, code, extracted DOCX text, and images.' });
       return;
     }
 
     await runBusy('Exporting PDF', async () => {
-      const pdfUri = await exportTextToPdf(activeFile, content);
+      const pdfUri = activeFile.kind === 'image' ? await exportImageToPdf(activeFile) : await exportTextToPdf(activeFile, content);
       await shareFile(pdfUri, 'application/pdf');
       setNotice({ tone: 'success', text: 'PDF exported. Use the share sheet to save it anywhere.' });
       return pdfUri;
@@ -363,6 +373,46 @@ export default function App() {
     });
   }
 
+  async function handlePdfHighlight(pageNumber: number) {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Adding PDF highlight', async () => {
+      const result = await addHighlightToPdf(activeFile, pageNumber);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: 'Highlight added to a new PDF copy.' });
+      return result;
+    });
+  }
+
+  async function handlePdfRotate(pageNumber: number) {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Rotating PDF page', async () => {
+      const result = await rotatePdfPage(activeFile, pageNumber, true);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: 'Page rotated in a new PDF copy.' });
+      return result;
+    });
+  }
+
+  async function handlePdfMovePage(pageNumber: number, target: 'front' | 'end') {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Reordering PDF page', async () => {
+      const result = await movePdfPage(activeFile, pageNumber, target);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: `Page moved to the ${target} in a new PDF copy.` });
+      return result;
+    });
+  }
+
+  async function handlePdfSplitZip() {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Splitting PDF pages', async () => {
+      const result = await splitPdfToZip(activeFile);
+      await shareFile(result.uri, 'application/zip');
+      setNotice({ tone: 'success', text: 'PDF pages split into a ZIP. Use share sheet to save it.' });
+      return result;
+    });
+  }
+
   async function handlePickVault() {
     await runBusy('Opening folder', async () => {
       const uri = await requestVaultDirectory();
@@ -423,8 +473,12 @@ export default function App() {
           onOpenFile={openFile}
           onOpenExternal={handleOpenExternal}
           onPdfExtract={handlePdfExtract}
+          onPdfHighlight={handlePdfHighlight}
           onPdfMerge={handlePdfMerge}
+          onPdfMovePage={handlePdfMovePage}
           onPdfRemovePage={handlePdfRemovePage}
+          onPdfRotate={handlePdfRotate}
+          onPdfSplitZip={handlePdfSplitZip}
           onPdfStamp={handlePdfStamp}
           onSave={handleSave}
           onShare={handleShareActive}
@@ -628,8 +682,12 @@ function ViewerScreen({
   onOpenFile,
   onOpenExternal,
   onPdfExtract,
+  onPdfHighlight,
   onPdfMerge,
+  onPdfMovePage,
   onPdfRemovePage,
+  onPdfRotate,
+  onPdfSplitZip,
   onPdfStamp,
   onSave,
   onShare,
@@ -656,8 +714,12 @@ function ViewerScreen({
   onOpenFile: (file: AppFile) => void;
   onOpenExternal: () => void;
   onPdfExtract: (start: number, end: number) => void;
+  onPdfHighlight: (pageNumber: number) => void;
   onPdfMerge: () => void;
+  onPdfMovePage: (pageNumber: number, target: 'front' | 'end') => void;
   onPdfRemovePage: (pageNumber: number) => void;
+  onPdfRotate: (pageNumber: number) => void;
+  onPdfSplitZip: () => void;
   onPdfStamp: (text: string) => void;
   onSave: () => void;
   onShare: () => void;
@@ -689,7 +751,7 @@ function ViewerScreen({
           <Text style={[styles.helperText, { color: theme.colors.muted }]}>{getViewerHint(activeFile)}</Text>
           <View style={styles.toolbarWrap}>
             {canEdit ? <SmallButton label="Save" onPress={onSave} theme={theme} /> : null}
-            {activeFile.isTextLike || activeFile.kind === 'docx' ? <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} /> : null}
+            {activeFile.isTextLike || activeFile.kind === 'docx' || activeFile.kind === 'image' ? <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} /> : null}
             {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export TXT" onPress={() => onExportText('txt')} theme={theme} /> : null}
             {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export MD" onPress={() => onExportText('md')} theme={theme} /> : null}
             {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export DOCX" onPress={onExportDocx} theme={theme} /> : null}
@@ -720,8 +782,12 @@ function ViewerScreen({
           <RichPreview
             file={activeFile}
             onPdfExtract={onPdfExtract}
+            onPdfHighlight={onPdfHighlight}
             onPdfMerge={onPdfMerge}
+            onPdfMovePage={onPdfMovePage}
             onPdfRemovePage={onPdfRemovePage}
+            onPdfRotate={onPdfRotate}
+            onPdfSplitZip={onPdfSplitZip}
             onPdfStamp={onPdfStamp}
             theme={theme}
           />
@@ -894,15 +960,23 @@ function renderCodeInline(line: string, theme: AppTheme) {
 function RichPreview({
   file,
   onPdfExtract,
+  onPdfHighlight,
   onPdfMerge,
+  onPdfMovePage,
   onPdfRemovePage,
+  onPdfRotate,
+  onPdfSplitZip,
   onPdfStamp,
   theme,
 }: {
   file: AppFile;
   onPdfExtract: (start: number, end: number) => void;
+  onPdfHighlight: (pageNumber: number) => void;
   onPdfMerge: () => void;
+  onPdfMovePage: (pageNumber: number, target: 'front' | 'end') => void;
   onPdfRemovePage: (pageNumber: number) => void;
+  onPdfRotate: (pageNumber: number) => void;
+  onPdfSplitZip: () => void;
   onPdfStamp: (text: string) => void;
   theme: AppTheme;
 }) {
@@ -912,8 +986,12 @@ function RichPreview({
         <PdfPreview file={file} theme={theme} />
         <PdfToolsPanel
           onExtract={onPdfExtract}
+          onHighlight={onPdfHighlight}
           onMerge={onPdfMerge}
+          onMovePage={onPdfMovePage}
           onRemovePage={onPdfRemovePage}
+          onRotate={onPdfRotate}
+          onSplitZip={onPdfSplitZip}
           onStamp={onPdfStamp}
           theme={theme}
         />
@@ -959,21 +1037,29 @@ function RichPreview({
 
 function PdfToolsPanel({
   onExtract,
+  onHighlight,
   onMerge,
+  onMovePage,
   onRemovePage,
+  onRotate,
+  onSplitZip,
   onStamp,
   theme,
 }: {
   onExtract: (start: number, end: number) => void;
+  onHighlight: (pageNumber: number) => void;
   onMerge: () => void;
+  onMovePage: (pageNumber: number, target: 'front' | 'end') => void;
   onRemovePage: (pageNumber: number) => void;
+  onRotate: (pageNumber: number) => void;
+  onSplitZip: () => void;
   onStamp: (text: string) => void;
   theme: AppTheme;
 }) {
   const [stampText, setStampText] = useState('');
   const [startPage, setStartPage] = useState('1');
   const [endPage, setEndPage] = useState('1');
-  const [removePage, setRemovePage] = useState('1');
+  const [toolPage, setToolPage] = useState('1');
 
   const parsePage = (value: string, fallback: number) => {
     const parsed = Number.parseInt(value, 10);
@@ -1018,15 +1104,23 @@ function PdfToolsPanel({
 
       <View style={styles.inlineForm}>
         <TextInput
-          value={removePage}
-          onChangeText={setRemovePage}
+          value={toolPage}
+          onChangeText={setToolPage}
           keyboardType="number-pad"
           placeholder="Page"
           placeholderTextColor={theme.colors.faint}
           style={[styles.smallInput, { color: theme.colors.text, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
         />
-        <SmallButton label="Remove page" onPress={() => onRemovePage(parsePage(removePage, 1))} theme={theme} />
+        <SmallButton label="Highlight" onPress={() => onHighlight(parsePage(toolPage, 1))} theme={theme} />
+        <SmallButton label="Rotate" onPress={() => onRotate(parsePage(toolPage, 1))} theme={theme} />
+        <SmallButton label="Remove" onPress={() => onRemovePage(parsePage(toolPage, 1))} theme={theme} />
+      </View>
+
+      <View style={styles.toolbarWrap}>
+        <SmallButton label="Move page front" onPress={() => onMovePage(parsePage(toolPage, 1), 'front')} theme={theme} />
+        <SmallButton label="Move page end" onPress={() => onMovePage(parsePage(toolPage, 1), 'end')} theme={theme} />
         <SmallButton label="Merge PDF" onPress={onMerge} theme={theme} />
+        <SmallButton label="Split ZIP" onPress={onSplitZip} theme={theme} />
       </View>
     </View>
   );

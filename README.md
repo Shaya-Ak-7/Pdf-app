@@ -13,7 +13,7 @@ Current direction:
 
 ## Current status
 
-Implemented foundation plus the 70% MVP test build target features. Full-app completion is not 70% yet; after the latest PDF/DOCX/vault work it is closer to 50–55% of the larger full-app plan.
+Implemented foundation plus the 70% MVP test build target features. Full-app completion is not 70% yet; after the latest PDF/DOCX/vault/conversion work it is closer to 60–65% of the larger full-app plan.
 
 - Minimal mobile UI
 - File picker and recent files
@@ -26,9 +26,9 @@ Implemented foundation plus the 70% MVP test build target features. Full-app com
 - Text/code view/edit/find/replace/save
 - Native PDF preview module for Android/iOS via `react-native-pdf`
 - Web PDF iframe preview fallback
-- PDF safe-copy tools: add text, extract page range, remove page, merge PDF
+- PDF safe-copy tools: add text, highlight, rotate, extract page range, remove page, move page, merge PDF, split pages to ZIP
 - DOCX text extraction/preview using DOCX XML parsing
-- DOCX export from readable text
+- DOCX export from readable text with basic markdown formatting
 - Lightweight syntax-highlighted code preview
 - Vault graph panel
 - Image preview

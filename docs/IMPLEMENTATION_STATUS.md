@@ -7,7 +7,7 @@ Important distinction:
 - MVP 70% = testable personal-use build with core viewer/editor/converter/vault features.
 - Full-app 70% = stronger PDF tools, conversion tools, vault graph, DOCX export, and more polished file workflows.
 
-After the latest work, full-app completion is closer to **50–55%**, not 70% yet. Full-app 70% still needs deeper PDF annotation/split/merge polish, richer DOCX formatting, and more testing.
+After the latest work, full-app completion is closer to **60–65%**, not 70% yet. Full-app 70% still needs deeper visual PDF annotation, richer DOCX formatting, batch conversion polish, and APK build validation.
 
 ## Completed
 - Expo React Native + TypeScript app foundation.
@@ -30,12 +30,13 @@ After the latest work, full-app completion is closer to **50–55%**, not 70% ye
 - Clickable wiki-link/backlink chips when linked note exists in vault.
 - Native PDF preview module for Android/iOS using `react-native-pdf`.
 - Web PDF preview fallback using iframe.
-- PDF safe-copy tools using `pdf-lib`: add text to every page, extract page range, remove a page, and merge another PDF.
+- PDF safe-copy tools using `pdf-lib`: add text to every page, highlight a page area, rotate page, extract page range, remove a page, move page to front/end, merge another PDF, and split pages to ZIP.
 - DOCX text extraction and simplified preview via DOCX XML parsing.
-- DOCX export from readable text/markdown/code/extracted DOCX text.
+- DOCX export from readable text/markdown/code/extracted DOCX text with basic headings, bullets, tasks, bold, and italic handling.
 - Lightweight syntax-highlighted code preview.
 - Vault graph panel with connected note nodes and edge list.
 - Image preview.
+- Image → PDF export.
 - Unsupported/unknown file fallback metadata screen.
 - Native Android project generated using Expo prebuild.
 - EAS config added for internal APK builds.

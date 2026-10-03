@@ -156,6 +156,29 @@ export async function exportTextToPdf(file: AppFile, content: string): Promise<s
   return result.uri;
 }
 
+export async function exportImageToPdf(file: AppFile): Promise<string> {
+  const title = escapeHtml(file.name);
+  const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #171717; }
+      h1 { font-size: 14px; color: #555; margin: 0 0 16px; }
+      .frame { min-height: 90vh; display: flex; align-items: center; justify-content: center; }
+      img { max-width: 100%; max-height: 90vh; object-fit: contain; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <div class="frame"><img src="${file.uri}" /></div>
+  </body>
+</html>`;
+
+  const result = await Print.printToFileAsync({ html, base64: false });
+  return result.uri;
+}
+
 export async function exportTextAsFile(
   file: AppFile,
   content: string,
