@@ -11,9 +11,9 @@ Current direction:
 - Minimal practical UI
 - Open-with/share support for broad file intake
 
-## Current MVP status
+## Current status
 
-Implemented foundation plus the 70% test build target features:
+Implemented foundation plus the 70% MVP test build target features. Full-app completion is not 70% yet; after the latest PDF/DOCX/vault work it is closer to 50–55% of the larger full-app plan.
 
 - Minimal mobile UI
 - File picker and recent files
@@ -26,11 +26,15 @@ Implemented foundation plus the 70% test build target features:
 - Text/code view/edit/find/replace/save
 - Native PDF preview module for Android/iOS via `react-native-pdf`
 - Web PDF iframe preview fallback
+- PDF safe-copy tools: add text, extract page range, remove page, merge PDF
 - DOCX text extraction/preview using DOCX XML parsing
+- DOCX export from readable text
+- Lightweight syntax-highlighted code preview
+- Vault graph panel
 - Image preview
 - Unknown-file metadata fallback
 - Export text/markdown/code/DOCX text to PDF
-- Export readable text to TXT/MD
+- Export readable text to TXT/MD/DOCX
 - Native Android project generated with Expo prebuild
 
 ## Development
@@ -57,6 +61,6 @@ Output path after a successful local build:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-This sandbox currently does not have Java/Android SDK installed, so the local Gradle APK command cannot complete here until those tools are available. `eas.json` is also configured for an internal APK build through EAS using the `preview` profile.
+A Java 17 runtime has been installed in this sandbox through `jdk4py`, but Gradle/Android SDK downloads are currently blocked by TLS/network errors from the sandbox. `eas.json` is also configured for an internal APK build through EAS using the `preview` profile.
 
 Planning document: [`docs/APP_PLAN.md`](docs/APP_PLAN.md)

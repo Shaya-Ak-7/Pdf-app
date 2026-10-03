@@ -23,6 +23,7 @@ import {
   addRecent,
   createNote,
   exportTextAsFile,
+  exportTextToDocx,
   exportTextToPdf,
   hydrateTextContent,
   loadRecents,
@@ -42,6 +43,7 @@ import {
   makePreview,
 } from './src/lib/markdown';
 import { PdfPreview } from './src/components/PdfPreview';
+import { addTextStampToPdf, extractPdfPages, mergePdfFiles, removePdfPage } from './src/lib/pdfTools';
 import { buildVaultIndex, filterVaultFiles, type VaultIndex } from './src/lib/vault';
 
 type Notice = { tone: 'info' | 'error' | 'success'; text: string } | null;
@@ -278,6 +280,89 @@ export default function App() {
     });
   }
 
+  async function handleExportDocx() {
+    if (!activeFile) return;
+    const content = editorText || activeFile.textContent || '';
+    if (!content) {
+      setNotice({ tone: 'error', text: 'No readable text is available to export as DOCX.' });
+      return;
+    }
+
+    await runBusy('Exporting DOCX', async () => {
+      const output = await exportTextToDocx(activeFile, content);
+      await shareFile(output.uri, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      setNotice({ tone: 'success', text: 'DOCX exported. Use the share sheet to save it anywhere.' });
+      return output;
+    });
+  }
+
+  async function openGeneratedPdf(result: { uri: string; name: string; pageCount?: number }) {
+    await openFile(
+      makeAppFile({
+        uri: result.uri,
+        name: result.name,
+        mimeType: 'application/pdf',
+        source: 'created',
+      })
+    );
+  }
+
+  async function handlePdfStamp(text: string) {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Adding text to PDF', async () => {
+      const result = await addTextStampToPdf(activeFile, text);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: 'Text added to a new PDF copy.' });
+      return result;
+    });
+  }
+
+  async function handlePdfExtract(start: number, end: number) {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Extracting PDF pages', async () => {
+      const result = await extractPdfPages(activeFile, start, end);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: 'Page range extracted to a new PDF.' });
+      return result;
+    });
+  }
+
+  async function handlePdfRemovePage(pageNumber: number) {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Removing PDF page', async () => {
+      const result = await removePdfPage(activeFile, pageNumber);
+      await openGeneratedPdf(result);
+      setNotice({ tone: 'success', text: 'Page removed in a new PDF copy.' });
+      return result;
+    });
+  }
+
+  async function handlePdfMerge() {
+    if (!activeFile || activeFile.kind !== 'pdf') return;
+    await runBusy('Choosing PDF to merge', async () => {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return null;
+
+      const asset = result.assets[0];
+      const other = makeAppFile({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType || 'application/pdf',
+        size: asset.size,
+        source: 'picker',
+      });
+      const merged = await mergePdfFiles(activeFile, other);
+      await openGeneratedPdf(merged);
+      setNotice({ tone: 'success', text: 'PDFs merged into a new file copy.' });
+      return merged;
+    });
+  }
+
   async function handlePickVault() {
     await runBusy('Opening folder', async () => {
       const uri = await requestVaultDirectory();
@@ -332,10 +417,15 @@ export default function App() {
           setSearchTerm={setSearchTerm}
           vaultIndex={vaultIndex}
           onBack={() => setScreen('home')}
+          onExportDocx={handleExportDocx}
           onExportPdf={handleExportPdf}
           onExportText={handleExportText}
           onOpenFile={openFile}
           onOpenExternal={handleOpenExternal}
+          onPdfExtract={handlePdfExtract}
+          onPdfMerge={handlePdfMerge}
+          onPdfRemovePage={handlePdfRemovePage}
+          onPdfStamp={handlePdfStamp}
           onSave={handleSave}
           onShare={handleShareActive}
           theme={theme}
@@ -348,6 +438,7 @@ export default function App() {
         <ConvertScreen
           activeFile={activeFile}
           onBack={() => setScreen('home')}
+          onExportDocx={handleExportDocx}
           onExportPdf={handleExportPdf}
           onExportText={handleExportText}
           onPickFile={handlePickFile}
@@ -531,10 +622,15 @@ function ViewerScreen({
   setSearchTerm,
   vaultIndex,
   onBack,
+  onExportDocx,
   onExportPdf,
   onExportText,
   onOpenFile,
   onOpenExternal,
+  onPdfExtract,
+  onPdfMerge,
+  onPdfRemovePage,
+  onPdfStamp,
   onSave,
   onShare,
   theme,
@@ -554,10 +650,15 @@ function ViewerScreen({
   setSearchTerm: (value: string) => void;
   vaultIndex: VaultIndex | null;
   onBack: () => void;
+  onExportDocx: () => void;
   onExportPdf: () => void;
   onExportText: (extension: 'txt' | 'md') => void;
   onOpenFile: (file: AppFile) => void;
   onOpenExternal: () => void;
+  onPdfExtract: (start: number, end: number) => void;
+  onPdfMerge: () => void;
+  onPdfRemovePage: (pageNumber: number) => void;
+  onPdfStamp: (text: string) => void;
   onSave: () => void;
   onShare: () => void;
   theme: AppTheme;
@@ -591,6 +692,7 @@ function ViewerScreen({
             {activeFile.isTextLike || activeFile.kind === 'docx' ? <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} /> : null}
             {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export TXT" onPress={() => onExportText('txt')} theme={theme} /> : null}
             {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export MD" onPress={() => onExportText('md')} theme={theme} /> : null}
+            {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export DOCX" onPress={onExportDocx} theme={theme} /> : null}
             <SmallButton label="Share" onPress={onShare} theme={theme} />
             <SmallButton label="Open external" onPress={onOpenExternal} theme={theme} />
           </View>
@@ -615,7 +717,14 @@ function ViewerScreen({
             theme={theme}
           />
         ) : (
-          <RichPreview file={activeFile} theme={theme} />
+          <RichPreview
+            file={activeFile}
+            onPdfExtract={onPdfExtract}
+            onPdfMerge={onPdfMerge}
+            onPdfRemovePage={onPdfRemovePage}
+            onPdfStamp={onPdfStamp}
+            theme={theme}
+          />
         )}
       </ScrollView>
     </View>
@@ -732,16 +841,84 @@ function TextViewerEditor({
         />
       ) : (
         <View style={[styles.readerBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          <Text style={[styles.readerText, file.kind === 'code' ? styles.monoText : null, { color: theme.colors.text }]}>{editorText || 'Empty file'}</Text>
+          {file.kind === 'code' ? (
+            <CodePreview content={editorText || 'Empty file'} theme={theme} />
+          ) : (
+            <Text style={[styles.readerText, { color: theme.colors.text }]}>{editorText || 'Empty file'}</Text>
+          )}
         </View>
       )}
     </View>
   );
 }
 
-function RichPreview({ file, theme }: { file: AppFile; theme: AppTheme }) {
+function CodePreview({ content, theme }: { content: string; theme: AppTheme }) {
+  return (
+    <View style={styles.codeBox}>
+      {content.split('\n').map((line, index) => (
+        <Text key={`${index}-${line}`} style={[styles.readerText, styles.monoText, { color: theme.colors.text }]}> 
+          <Text style={{ color: theme.colors.faint }}>{`${index + 1}`.padStart(3, ' ')}  </Text>
+          {renderCodeInline(line, theme)}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function renderCodeInline(line: string, theme: AppTheme) {
+  if (/^\s*(\/\/|#|--)/.test(line)) {
+    return <Text style={{ color: theme.colors.success }}>{line}</Text>;
+  }
+
+  const tokenRegex = /(\/\/.*$|#.*$|"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|\b(?:const|let|var|function|return|class|import|export|from|async|await|if|else|for|while|try|catch|type|interface|def|public|private|protected|new|true|false|null|undefined)\b)/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenRegex.exec(line))) {
+    if (match.index > lastIndex) nodes.push(line.slice(lastIndex, match.index));
+    const token = match[0];
+    const color = token.startsWith('//') || token.startsWith('#') ? theme.colors.success : token.startsWith('"') || token.startsWith("'") ? theme.colors.muted : theme.colors.accent;
+    nodes.push(
+      <Text key={`${token}-${match.index}`} style={{ color, fontWeight: token.startsWith('"') || token.startsWith("'") ? '400' : '800' }}>
+        {token}
+      </Text>
+    );
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < line.length) nodes.push(line.slice(lastIndex));
+  return nodes.length ? nodes : line || ' ';
+}
+
+function RichPreview({
+  file,
+  onPdfExtract,
+  onPdfMerge,
+  onPdfRemovePage,
+  onPdfStamp,
+  theme,
+}: {
+  file: AppFile;
+  onPdfExtract: (start: number, end: number) => void;
+  onPdfMerge: () => void;
+  onPdfRemovePage: (pageNumber: number) => void;
+  onPdfStamp: (text: string) => void;
+  theme: AppTheme;
+}) {
   if (file.kind === 'pdf') {
-    return <PdfPreview file={file} theme={theme} />;
+    return (
+      <View style={styles.stack}>
+        <PdfPreview file={file} theme={theme} />
+        <PdfToolsPanel
+          onExtract={onPdfExtract}
+          onMerge={onPdfMerge}
+          onRemovePage={onPdfRemovePage}
+          onStamp={onPdfStamp}
+          theme={theme}
+        />
+      </View>
+    );
   }
 
   if (file.kind === 'docx' && file.textContent) {
@@ -780,9 +957,85 @@ function RichPreview({ file, theme }: { file: AppFile; theme: AppTheme }) {
   );
 }
 
+function PdfToolsPanel({
+  onExtract,
+  onMerge,
+  onRemovePage,
+  onStamp,
+  theme,
+}: {
+  onExtract: (start: number, end: number) => void;
+  onMerge: () => void;
+  onRemovePage: (pageNumber: number) => void;
+  onStamp: (text: string) => void;
+  theme: AppTheme;
+}) {
+  const [stampText, setStampText] = useState('');
+  const [startPage, setStartPage] = useState('1');
+  const [endPage, setEndPage] = useState('1');
+  const [removePage, setRemovePage] = useState('1');
+
+  const parsePage = (value: string, fallback: number) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
+  return (
+    <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>PDF tools</Text>
+      <Text style={[styles.helperText, { color: theme.colors.muted }]}>Creates new PDF copies, so your original file stays safe.</Text>
+
+      <View style={styles.inlineForm}>
+        <TextInput
+          value={stampText}
+          onChangeText={setStampText}
+          placeholder="Text to add on every page"
+          placeholderTextColor={theme.colors.faint}
+          style={[styles.input, { color: theme.colors.text, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+        />
+        <SmallButton label="Add text" onPress={() => onStamp(stampText)} theme={theme} />
+      </View>
+
+      <View style={styles.inlineForm}>
+        <TextInput
+          value={startPage}
+          onChangeText={setStartPage}
+          keyboardType="number-pad"
+          placeholder="Start"
+          placeholderTextColor={theme.colors.faint}
+          style={[styles.smallInput, { color: theme.colors.text, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+        />
+        <TextInput
+          value={endPage}
+          onChangeText={setEndPage}
+          keyboardType="number-pad"
+          placeholder="End"
+          placeholderTextColor={theme.colors.faint}
+          style={[styles.smallInput, { color: theme.colors.text, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+        />
+        <SmallButton label="Extract range" onPress={() => onExtract(parsePage(startPage, 1), parsePage(endPage, 1))} theme={theme} />
+      </View>
+
+      <View style={styles.inlineForm}>
+        <TextInput
+          value={removePage}
+          onChangeText={setRemovePage}
+          keyboardType="number-pad"
+          placeholder="Page"
+          placeholderTextColor={theme.colors.faint}
+          style={[styles.smallInput, { color: theme.colors.text, backgroundColor: theme.colors.input, borderColor: theme.colors.border }]}
+        />
+        <SmallButton label="Remove page" onPress={() => onRemovePage(parsePage(removePage, 1))} theme={theme} />
+        <SmallButton label="Merge PDF" onPress={onMerge} theme={theme} />
+      </View>
+    </View>
+  );
+}
+
 function ConvertScreen({
   activeFile,
   onBack,
+  onExportDocx,
   onExportPdf,
   onExportText,
   onPickFile,
@@ -790,6 +1043,7 @@ function ConvertScreen({
 }: {
   activeFile: AppFile | null;
   onBack: () => void;
+  onExportDocx: () => void;
   onExportPdf: () => void;
   onExportText: (extension: 'txt' | 'md') => void;
   onPickFile: () => void;
@@ -807,13 +1061,14 @@ function ConvertScreen({
             <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} />
             <SmallButton label="Export TXT" onPress={() => onExportText('txt')} theme={theme} />
             <SmallButton label="Export MD" onPress={() => onExportText('md')} theme={theme} />
+            <SmallButton label="Export DOCX" onPress={onExportDocx} theme={theme} />
           </View>
         </View>
         <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Conversion roadmap</Text>
-          <Bullet text="TXT / MD / code → PDF is wired first." theme={theme} />
-          <Bullet text="PDF split/merge and annotations will be added as native PDF tools." theme={theme} />
-          <Bullet text="DOCX preview and DOCX → text/markdown/PDF comes after PDF viewer stabilization." theme={theme} />
+          <Bullet text="TXT / MD / code / extracted DOCX → PDF, TXT, MD, and DOCX are wired." theme={theme} />
+          <Bullet text="PDF tools now create safe copies for add-text, extract range, remove page, and merge." theme={theme} />
+          <Bullet text="Rich DOCX formatting and advanced PDF annotations are still next-level modules." theme={theme} />
         </View>
       </ScrollView>
     </View>
@@ -912,6 +1167,8 @@ function VaultScreen({
           </View>
         ) : null}
 
+        {index ? <VaultGraph index={index} onOpenFile={onOpenFile} theme={theme} /> : null}
+
         <View style={[styles.listPanel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
           {visible.length === 0 ? (
             <EmptyState title="No files here" body="Choose another folder, clear the tag, or clear the search." theme={theme} />
@@ -920,6 +1177,51 @@ function VaultScreen({
           )}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function VaultGraph({ index, onOpenFile, theme }: { index: VaultIndex; onOpenFile: (file: AppFile) => void; theme: AppTheme }) {
+  const connectedNotes = index.notes
+    .map((note) => ({ ...note, degree: note.links.length + (note.backlinks?.length ?? 0) }))
+    .sort((a, b) => b.degree - a.degree)
+    .slice(0, 12);
+  const edges = index.notes.flatMap((note) => note.links.map((link) => `${note.title} → ${link}`)).slice(0, 16);
+
+  return (
+    <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Graph</Text>
+      <Text style={[styles.helperText, { color: theme.colors.muted }]}>Lightweight graph view for your markdown vault. Tap a node to open the note.</Text>
+      <View style={styles.graphNodes}>
+        {connectedNotes.length ? (
+          connectedNotes.map((note) => (
+            <Pressable
+              key={note.file.uri}
+              onPress={() => onOpenFile(note.file)}
+              style={({ pressed }) => [
+                styles.graphNode,
+                {
+                  backgroundColor: pressed ? theme.colors.surfaceMuted : theme.colors.accentSoft,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.pillText, { color: theme.colors.text }]} numberOfLines={1}>{note.title}</Text>
+              <Text style={[styles.metaText, { color: theme.colors.muted }]}>{note.degree} links</Text>
+            </Pressable>
+          ))
+        ) : (
+          <Text style={[styles.metaText, { color: theme.colors.faint }]}>Add [[wiki links]] between notes to build the graph.</Text>
+        )}
+      </View>
+      {edges.length ? (
+        <View style={styles.stackTiny}>
+          <Text style={[styles.metaText, { color: theme.colors.muted }]}>Edges</Text>
+          {edges.map((edge) => (
+            <Text key={edge} style={[styles.metaText, { color: theme.colors.text }]}>{edge}</Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1414,9 +1716,30 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
+  graphNodes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  graphNode: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minWidth: 112,
+    maxWidth: 170,
+  },
   input: {
     flex: 1,
     minWidth: 150,
+    minHeight: 42,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+  },
+  smallInput: {
+    width: 76,
     minHeight: 42,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,
@@ -1534,6 +1857,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     minHeight: 320,
+  },
+  codeBox: {
+    gap: 1,
   },
   readerText: {
     fontSize: 14,

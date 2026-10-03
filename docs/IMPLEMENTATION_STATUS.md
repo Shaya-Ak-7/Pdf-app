@@ -1,7 +1,13 @@
 # Implementation Status
 
 ## Current milestone
-Approximate completion: **70% MVP test build target**
+Approximate completion: **70% MVP test build target** and moving toward **full-app 70%**.
+
+Important distinction:
+- MVP 70% = testable personal-use build with core viewer/editor/converter/vault features.
+- Full-app 70% = stronger PDF tools, conversion tools, vault graph, DOCX export, and more polished file workflows.
+
+After the latest work, full-app completion is closer to **50–55%**, not 70% yet. Full-app 70% still needs deeper PDF annotation/split/merge polish, richer DOCX formatting, and more testing.
 
 ## Completed
 - Expo React Native + TypeScript app foundation.
@@ -24,7 +30,11 @@ Approximate completion: **70% MVP test build target**
 - Clickable wiki-link/backlink chips when linked note exists in vault.
 - Native PDF preview module for Android/iOS using `react-native-pdf`.
 - Web PDF preview fallback using iframe.
+- PDF safe-copy tools using `pdf-lib`: add text to every page, extract page range, remove a page, and merge another PDF.
 - DOCX text extraction and simplified preview via DOCX XML parsing.
+- DOCX export from readable text/markdown/code/extracted DOCX text.
+- Lightweight syntax-highlighted code preview.
+- Vault graph panel with connected note nodes and edge list.
 - Image preview.
 - Unsupported/unknown file fallback metadata screen.
 - Native Android project generated using Expo prebuild.
@@ -33,9 +43,9 @@ Approximate completion: **70% MVP test build target**
 ## Not fully complete yet
 - Rich DOCX formatting edit like Microsoft Word.
 - Adobe-style direct PDF text editing.
-- PDF annotation tools: highlight, text insertion, signature.
-- PDF split/merge/reorder/delete pages.
-- Full graph view UI.
+- Advanced PDF annotation tools: highlight, drawing, signature, and visual placement.
+- Polished PDF split/merge/reorder/delete page flows with thumbnails and page picker.
+- Full interactive graph canvas UI.
 - Full Obsidian plugin compatibility.
 - Polished APK icon/name after final app name is chosen.
 
@@ -46,10 +56,10 @@ Local APK build was attempted with:
 cd android && ./gradlew assembleDebug
 ```
 
-It failed because this sandbox does not have Java installed:
+The first attempt failed because Java was missing. A Java 17 runtime was then installed through `jdk4py`, so `java -version` works. The build is still blocked because Gradle and Android SDK downloads fail in this sandbox with TLS/network errors:
 
 ```txt
-JAVA_HOME is not set and no 'java' command could be found in your PATH.
+javax.net.ssl.SSLHandshakeException: Remote host terminated the handshake
 ```
 
-The project is configured for APK generation once Java + Android SDK or EAS Build authentication is available.
+The project is configured for APK generation once Gradle + Android SDK can be downloaded, or when EAS Build authentication is available.

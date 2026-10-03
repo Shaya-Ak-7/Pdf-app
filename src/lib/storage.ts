@@ -7,6 +7,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import type { AppFile, RecentFile } from '../types';
 import { getNameFromUri, makeAppFile, toRecentFile } from './fileTypes';
 import { extractDocxText } from './docx';
+import { createDocxFromText } from './docxExport';
 
 const APP_DIR = `${FileSystem.documentDirectory ?? ''}file-tool/`;
 const NOTES_DIR = `${APP_DIR}notes/`;
@@ -166,6 +167,10 @@ export async function exportTextAsFile(
   const uri = `${APP_DIR}${encodeURIComponent(outputName)}`;
   await FileSystem.writeAsStringAsync(uri, content);
   return uri;
+}
+
+export async function exportTextToDocx(file: AppFile, content: string): Promise<{ uri: string; name: string }> {
+  return createDocxFromText(file.name, content);
 }
 
 export async function shareFile(uri: string, mimeType?: string | null) {
