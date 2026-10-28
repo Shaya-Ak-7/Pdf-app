@@ -28,8 +28,10 @@ After the latest work, full-app completion is closer to **60–65%**, not 70% ye
 - Recursive vault scan with max depth/file safety limits.
 - Vault index: note count, tags, wiki links, backlinks.
 - Clickable wiki-link/backlink chips when linked note exists in vault.
-- Native PDF preview module for Android/iOS using `react-native-pdf`.
-- Web PDF preview fallback using iframe.
+- View-first Drive-style viewer (see `docs/DRIVE_PDF_VIEWER_ANALYSIS.md`): every intake source (system picker, Android "Open with"/share intents, recents, vault) opens files directly into a full-bleed read-only viewer. Editing and file tools are explicit app-bar actions, never the default surface.
+- Native PDF preview module for Android/iOS using `react-native-pdf`: full-height canvas, continuous scroll, pinch zoom (0.5x–4x), bottom bar with prev/next, live `x / y` page indicator, and jump-to-page input.
+- View-first readers: markdown → rendered preview; TXT → plain page reader; code → line-numbered highlighted reader; DOCX → extracted text on a page; image → contained full-bleed; unknown → metadata panel.
+- Web PDF preview fallback using iframe (browser-native Drive-like chrome).
 - PDF safe-copy tools using `pdf-lib`: add text to every page, highlight a page area, rotate page, extract page range, remove a page, move page to front/end, merge another PDF, and split pages to ZIP.
 - DOCX text extraction and simplified preview via DOCX XML parsing.
 - DOCX export from readable text/markdown/code/extracted DOCX text with basic headings, bullets, tasks, bold, and italic handling.

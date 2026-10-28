@@ -726,119 +726,250 @@ function ViewerScreen({
   theme: AppTheme;
 }) {
   const canEdit = activeFile.isEditable;
+  const [viewerTab, setViewerTab] = useState<'view' | 'tools'>('view');
+
+  // Any intake source (Open with / picker / share / recents / vault) lands in view mode first.
+  useEffect(() => {
+    setViewerTab('view');
+    setIsEditing(false);
+  }, [activeFile.uri]);
+
+  const editingText = Boolean(isEditing && activeFile.isTextLike);
 
   return (
     <View style={styles.fill}>
-      <TopBar title={activeFile.name} onBack={onBack} theme={theme}>
-        {canEdit ? <SmallButton label={isEditing ? 'Preview' : 'Edit'} onPress={() => setIsEditing(!isEditing)} theme={theme} /> : null}
-      </TopBar>
-
-      <ScrollView style={styles.fill} contentContainerStyle={styles.viewerContent}>
-        <View style={[styles.fileHero, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          <View style={styles.fileHeroTop}>
-            <View style={[styles.fileIcon, { backgroundColor: theme.colors.accentSoft }]}> 
-              <Text style={[styles.fileIconText, { color: theme.colors.text }]}>{activeFile.extension || activeFile.kind}</Text>
-            </View>
-            <View style={styles.flexOne}>
-              <Text style={[styles.fileName, { color: theme.colors.text }]} numberOfLines={2}>
-                {activeFile.name}
-              </Text>
-              <Text style={[styles.metaText, { color: theme.colors.muted }]}>
-                {getKindLabel(activeFile.kind)} · {formatBytes(activeFile.size)}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.helperText, { color: theme.colors.muted }]}>{getViewerHint(activeFile)}</Text>
-          <View style={styles.toolbarWrap}>
-            {canEdit ? <SmallButton label="Save" onPress={onSave} theme={theme} /> : null}
-            {activeFile.isTextLike || activeFile.kind === 'docx' || activeFile.kind === 'image' ? <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} /> : null}
-            {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export TXT" onPress={() => onExportText('txt')} theme={theme} /> : null}
-            {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export MD" onPress={() => onExportText('md')} theme={theme} /> : null}
-            {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export DOCX" onPress={onExportDocx} theme={theme} /> : null}
-            <SmallButton label="Share" onPress={onShare} theme={theme} />
-            <SmallButton label="Open external" onPress={onOpenExternal} theme={theme} />
-          </View>
+      {/* Drive-style app bar: back, file name, subtitle, actions */}
+      <View style={[styles.viewerBar, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}> 
+        <Pressable
+          accessibilityLabel="Back"
+          hitSlop={8}
+          onPress={onBack}
+          style={({ pressed }) => [styles.viewerBarIcon, { backgroundColor: pressed ? theme.colors.surfaceMuted : 'transparent' }]}
+        >
+          <Text style={[styles.viewerBarIconText, { color: theme.colors.text }]}>‹</Text>
+        </Pressable>
+        <View style={styles.flexOne}>
+          <Text numberOfLines={1} style={[styles.viewerBarTitle, { color: theme.colors.text }]}>
+            {activeFile.name}
+          </Text>
+          <Text numberOfLines={1} style={[styles.viewerBarSubtitle, { color: theme.colors.muted }]}>
+            {getKindLabel(activeFile.kind)} · {formatBytes(activeFile.size)}
+          </Text>
         </View>
+        {canEdit ? (
+          <SmallButton label={isEditing ? 'Preview' : 'Edit'} onPress={() => setIsEditing(!isEditing)} theme={theme} />
+        ) : null}
+        <SmallButton label={viewerTab === 'tools' ? 'View' : 'Tools'} onPress={() => setViewerTab(viewerTab === 'view' ? 'tools' : 'view')} theme={theme} />
+        <SmallButton label="Share" onPress={onShare} theme={theme} />
+      </View>
 
-        {activeFile.isTextLike ? (
-          <TextViewerEditor
-            file={activeFile}
-            editorText={editorText}
-            isEditing={isEditing}
-            markdownStats={markdownStats}
+      {viewerTab === 'tools' ? (
+        <ScrollView style={styles.fill} contentContainerStyle={styles.viewerContent}>
+          <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>File info</Text>
+            <View style={styles.infoTable}>
+              <InfoLine label="Kind" value={getKindLabel(activeFile.kind)} theme={theme} />
+              <InfoLine label="MIME" value={activeFile.mimeType || 'Unknown'} theme={theme} />
+              <InfoLine label="Size" value={formatBytes(activeFile.size)} theme={theme} />
+              <InfoLine label="URI" value={activeFile.uri} theme={theme} />
+            </View>
+            <Text style={[styles.helperText, { color: theme.colors.muted }]}>{getViewerHint(activeFile)}</Text>
+            <View style={styles.toolbarWrap}>
+              {canEdit ? <SmallButton label="Save" onPress={onSave} theme={theme} /> : null}
+              {activeFile.isTextLike || activeFile.kind === 'docx' || activeFile.kind === 'image' ? <SmallButton label="Export PDF" onPress={onExportPdf} theme={theme} /> : null}
+              {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export TXT" onPress={() => onExportText('txt')} theme={theme} /> : null}
+              {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export MD" onPress={() => onExportText('md')} theme={theme} /> : null}
+              {activeFile.textContent || activeFile.isTextLike ? <SmallButton label="Export DOCX" onPress={onExportDocx} theme={theme} /> : null}
+              <SmallButton label="Open external" onPress={onOpenExternal} theme={theme} />
+            </View>
+          </View>
+
+          {activeFile.isTextLike ? (
+            <FindReplacePanel
+              isEditing={isEditing}
+              matchCount={matchCount}
+              replaceAll={replaceAll}
+              replaceOne={replaceOne}
+              replaceTerm={replaceTerm}
+              searchTerm={searchTerm}
+              setReplaceTerm={setReplaceTerm}
+              setSearchTerm={setSearchTerm}
+              theme={theme}
+            />
+          ) : null}
+
+          {activeFile.kind === 'markdown' ? (
+            <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+              <ObsidianInfo markdownStats={markdownStats} vaultIndex={vaultIndex} onOpenFile={onOpenFile} theme={theme} />
+            </View>
+          ) : null}
+
+          {activeFile.kind === 'pdf' ? (
+            <PdfToolsPanel
+              onExtract={onPdfExtract}
+              onHighlight={onPdfHighlight}
+              onMerge={onPdfMerge}
+              onMovePage={onPdfMovePage}
+              onRemovePage={onPdfRemovePage}
+              onRotate={onPdfRotate}
+              onSplitZip={onPdfSplitZip}
+              onStamp={onPdfStamp}
+              theme={theme}
+            />
+          ) : null}
+        </ScrollView>
+      ) : editingText ? (
+        // Explicit edit mode (Drive-style: editing is opt-in, never the default surface)
+        <ScrollView style={styles.fill} contentContainerStyle={styles.viewerContent}>
+          {activeFile.readError ? (
+            <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+              <Text style={[styles.bodyText, { color: theme.colors.danger }]}>{activeFile.readError}</Text>
+            </View>
+          ) : null}
+          <FindReplacePanel
+            isEditing
             matchCount={matchCount}
             replaceAll={replaceAll}
             replaceOne={replaceOne}
             replaceTerm={replaceTerm}
             searchTerm={searchTerm}
-            setEditorText={setEditorText}
             setReplaceTerm={setReplaceTerm}
             setSearchTerm={setSearchTerm}
-            vaultIndex={vaultIndex}
-            onOpenFile={onOpenFile}
             theme={theme}
           />
-        ) : (
-          <RichPreview
-            file={activeFile}
-            onPdfExtract={onPdfExtract}
-            onPdfHighlight={onPdfHighlight}
-            onPdfMerge={onPdfMerge}
-            onPdfMovePage={onPdfMovePage}
-            onPdfRemovePage={onPdfRemovePage}
-            onPdfRotate={onPdfRotate}
-            onPdfSplitZip={onPdfSplitZip}
-            onPdfStamp={onPdfStamp}
-            theme={theme}
+          <TextInput
+            value={editorText}
+            onChangeText={setEditorText}
+            multiline
+            textAlignVertical="top"
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[
+              styles.editor,
+              {
+                color: theme.colors.text,
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+              activeFile.kind === 'code' ? styles.monoText : null,
+            ]}
           />
-        )}
-      </ScrollView>
+          <View style={styles.toolbarWrap}>
+            <SmallButton label="Save" onPress={onSave} theme={theme} />
+          </View>
+        </ScrollView>
+      ) : (
+        // View-first surface: full-bleed, read-only, content is the hero.
+        <ReadSurface file={activeFile} editorText={editorText} theme={theme} />
+      )}
     </View>
   );
 }
 
-function TextViewerEditor({
-  file,
-  editorText,
+function ReadSurface({ file, editorText, theme }: { file: AppFile; editorText: string; theme: AppTheme }) {
+  if (file.kind === 'pdf') {
+    return <PdfPreview file={file} theme={theme} />;
+  }
+
+  if (file.kind === 'image') {
+    return (
+      <View style={[styles.readCanvas, { backgroundColor: theme.colors.background }]}> 
+        <Image source={{ uri: file.uri }} resizeMode="contain" style={styles.readImage} />
+      </View>
+    );
+  }
+
+  if (file.kind === 'docx' && file.textContent) {
+    return (
+      <View style={[styles.readCanvas, { backgroundColor: theme.colors.background }]}> 
+        <ScrollView contentContainerStyle={styles.readPageWrap}>
+          <View style={[styles.readPage, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            <Text selectable style={[styles.readerText, { color: theme.colors.text }]}>{file.textContent}</Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (file.isTextLike || file.textContent != null) {
+    return (
+      <View style={[styles.readCanvas, { backgroundColor: theme.colors.background }]}> 
+        <ScrollView contentContainerStyle={styles.readPageWrap}>
+          <View style={[styles.readPage, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            {file.readError ? <Text style={[styles.bodyText, { color: theme.colors.danger }]}>{file.readError}</Text> : null}
+            {file.kind === 'markdown' ? (
+              <MarkdownPreview content={editorText || file.textContent || ''} theme={theme} />
+            ) : file.kind === 'code' ? (
+              <CodePreview content={editorText || file.textContent || 'Empty file'} theme={theme} />
+            ) : (
+              <Text selectable style={[styles.readerText, { color: theme.colors.text }]}>{editorText || file.textContent || 'Empty file'}</Text>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.readCanvas, styles.centerPanel, { backgroundColor: theme.colors.background }]}> 
+      <Text style={[styles.previewGlyph, { color: theme.colors.faint }]}>{file.extension || 'file'}</Text>
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Preview not available locally</Text>
+      {file.readError ? <Text style={[styles.bodyText, { color: theme.colors.danger, textAlign: 'center' }]}>{file.readError}</Text> : null}
+      <Text style={[styles.bodyText, { color: theme.colors.muted, textAlign: 'center' }]}>
+        This file is accepted by the app. Use Share or Open external, or open Tools for metadata.
+      </Text>
+    </View>
+  );
+}
+
+function FindReplacePanel({
   isEditing,
-  markdownStats,
   matchCount,
   replaceAll,
   replaceOne,
   replaceTerm,
   searchTerm,
-  setEditorText,
   setReplaceTerm,
   setSearchTerm,
-  vaultIndex,
-  onOpenFile,
   theme,
 }: {
-  file: AppFile;
-  editorText: string;
   isEditing: boolean;
-  markdownStats: { links: string[]; tags: string[]; backlinks: string[]; preview: string };
   matchCount: number;
   replaceAll: () => void;
   replaceOne: () => void;
   replaceTerm: string;
   searchTerm: string;
-  setEditorText: (value: string) => void;
   setReplaceTerm: (value: string) => void;
   setSearchTerm: (value: string) => void;
-  vaultIndex: VaultIndex | null;
-  onOpenFile: (file: AppFile) => void;
   theme: AppTheme;
 }) {
   return (
-    <View style={styles.stack}>
-      <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Find / replace</Text>
+    <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Find / replace</Text>
+      <View style={styles.inlineForm}>
+        <TextInput
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          placeholder="Find"
+          placeholderTextColor={theme.colors.faint}
+          autoCapitalize="none"
+          style={[
+            styles.input,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.input,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        />
+        <Text style={[styles.metaText, { color: theme.colors.muted }]}>{matchCount} matches</Text>
+      </View>
+      {isEditing ? (
         <View style={styles.inlineForm}>
           <TextInput
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            placeholder="Find"
+            value={replaceTerm}
+            onChangeText={setReplaceTerm}
+            placeholder="Replace with"
             placeholderTextColor={theme.colors.faint}
             autoCapitalize="none"
             style={[
@@ -850,70 +981,10 @@ function TextViewerEditor({
               },
             ]}
           />
-          <Text style={[styles.metaText, { color: theme.colors.muted }]}>{matchCount} matches</Text>
-        </View>
-        {isEditing ? (
-          <View style={styles.inlineForm}>
-            <TextInput
-              value={replaceTerm}
-              onChangeText={setReplaceTerm}
-              placeholder="Replace with"
-              placeholderTextColor={theme.colors.faint}
-              autoCapitalize="none"
-              style={[
-                styles.input,
-                {
-                  color: theme.colors.text,
-                  backgroundColor: theme.colors.input,
-                  borderColor: theme.colors.border,
-                },
-              ]}
-            />
-            <SmallButton label="One" onPress={replaceOne} theme={theme} />
-            <SmallButton label="All" onPress={replaceAll} theme={theme} />
-          </View>
-        ) : null}
-      </View>
-
-      {file.readError ? (
-        <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          <Text style={[styles.bodyText, { color: theme.colors.danger }]}>{file.readError}</Text>
+          <SmallButton label="One" onPress={replaceOne} theme={theme} />
+          <SmallButton label="All" onPress={replaceAll} theme={theme} />
         </View>
       ) : null}
-
-      {file.kind === 'markdown' && !isEditing ? (
-        <View style={[styles.panel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          <MarkdownPreview content={editorText} theme={theme} />
-          <Divider theme={theme} />
-          <ObsidianInfo markdownStats={markdownStats} vaultIndex={vaultIndex} onOpenFile={onOpenFile} theme={theme} />
-        </View>
-      ) : isEditing ? (
-        <TextInput
-          value={editorText}
-          onChangeText={setEditorText}
-          multiline
-          textAlignVertical="top"
-          autoCapitalize="none"
-          autoCorrect={false}
-          style={[
-            styles.editor,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border,
-            },
-            file.kind === 'code' ? styles.monoText : null,
-          ]}
-        />
-      ) : (
-        <View style={[styles.readerBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-          {file.kind === 'code' ? (
-            <CodePreview content={editorText || 'Empty file'} theme={theme} />
-          ) : (
-            <Text style={[styles.readerText, { color: theme.colors.text }]}>{editorText || 'Empty file'}</Text>
-          )}
-        </View>
-      )}
     </View>
   );
 }
@@ -957,83 +1028,6 @@ function renderCodeInline(line: string, theme: AppTheme) {
   return nodes.length ? nodes : line || ' ';
 }
 
-function RichPreview({
-  file,
-  onPdfExtract,
-  onPdfHighlight,
-  onPdfMerge,
-  onPdfMovePage,
-  onPdfRemovePage,
-  onPdfRotate,
-  onPdfSplitZip,
-  onPdfStamp,
-  theme,
-}: {
-  file: AppFile;
-  onPdfExtract: (start: number, end: number) => void;
-  onPdfHighlight: (pageNumber: number) => void;
-  onPdfMerge: () => void;
-  onPdfMovePage: (pageNumber: number, target: 'front' | 'end') => void;
-  onPdfRemovePage: (pageNumber: number) => void;
-  onPdfRotate: (pageNumber: number) => void;
-  onPdfSplitZip: () => void;
-  onPdfStamp: (text: string) => void;
-  theme: AppTheme;
-}) {
-  if (file.kind === 'pdf') {
-    return (
-      <View style={styles.stack}>
-        <PdfPreview file={file} theme={theme} />
-        <PdfToolsPanel
-          onExtract={onPdfExtract}
-          onHighlight={onPdfHighlight}
-          onMerge={onPdfMerge}
-          onMovePage={onPdfMovePage}
-          onRemovePage={onPdfRemovePage}
-          onRotate={onPdfRotate}
-          onSplitZip={onPdfSplitZip}
-          onStamp={onPdfStamp}
-          theme={theme}
-        />
-      </View>
-    );
-  }
-
-  if (file.kind === 'docx' && file.textContent) {
-    return (
-      <View style={[styles.readerBox, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>DOCX text preview</Text>
-        <Text style={[styles.helperText, { color: theme.colors.muted, marginBottom: 10 }]}>Formatting is simplified; export/share uses extracted text.</Text>
-        <Text style={[styles.readerText, { color: theme.colors.text }]}>{file.textContent}</Text>
-      </View>
-    );
-  }
-
-  if (file.kind === 'image') {
-    return (
-      <View style={[styles.imagePanel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-        <Image source={{ uri: file.uri }} resizeMode="contain" style={{ width: '100%', height: 420 }} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.panel, styles.centerPanel, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
-      <Text style={[styles.previewGlyph, { color: theme.colors.faint }]}>{file.extension || 'file'}</Text>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Drive-style preview shell</Text>
-      {file.readError ? <Text style={[styles.bodyText, { color: theme.colors.danger, textAlign: 'center' }]}>{file.readError}</Text> : null}
-      <Text style={[styles.bodyText, { color: theme.colors.muted, textAlign: 'center' }]}>
-        This file is accepted by the app. Native preview modules for this type can plug into this screen without changing the rest of the app.
-      </Text>
-      <View style={styles.infoTable}>
-        <InfoLine label="Kind" value={getKindLabel(file.kind)} theme={theme} />
-        <InfoLine label="MIME" value={file.mimeType || 'Unknown'} theme={theme} />
-        <InfoLine label="Size" value={formatBytes(file.size)} theme={theme} />
-        <InfoLine label="URI" value={file.uri} theme={theme} />
-      </View>
-    </View>
-  );
-}
 
 function PdfToolsPanel({
   onExtract,
@@ -1709,6 +1703,52 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
     paddingBottom: 40,
+  },
+  viewerBar: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingRight: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  viewerBarIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerBarIconText: {
+    fontSize: 26,
+    fontWeight: '500',
+    marginTop: -3,
+  },
+  viewerBarTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  viewerBarSubtitle: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  readCanvas: {
+    flex: 1,
+  },
+  readImage: {
+    flex: 1,
+    width: '100%',
+  },
+  readPageWrap: {
+    padding: 14,
+    paddingBottom: 32,
+  },
+  readPage: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 6,
+    padding: 18,
+    minHeight: 420,
   },
   headerRow: {
     flexDirection: 'row',
