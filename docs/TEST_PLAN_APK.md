@@ -52,6 +52,11 @@ Score targets:
 | D5 | Image | Center-la fill; pinch/scroll block illa | |
 | D6 | Find (Tools tab) | Search term type panna match count kaatanum | |
 | D7 | Replace (edit mode-la) | One/All replace work aaganum | |
+| D8 | `.xlsx` / `.ods` | Sheet periyaga rows-ah (columns tab-separated) kaatanum; old `.xls`-la friendly message + Open external | |
+| D9 | `.pptx` / `.odp` | "Slide 1, Slide 2…" per-slide text kaatanum | |
+| D10 | `.zip` / `.apk` / `.jar` | Contents list (folders + file names + sizes) kaatanum | |
+| D11 | Video `.mp4` | Full-screen player + system controls-la play aaganum | |
+| D12 | Audio `.mp3` | Play/Pause button work aaganum, duration kaatanum | |
 
 ## E. PDF tools (Tools tab) — P1
 
