@@ -1,17 +1,22 @@
-# GitHub Actions: Android debug APK build
+# GitHub Actions: Android debug APK build (v2 — hardened + release delivery)
 #
-# HOW TO ACTIVATE (takes ~2 minutes, no local setup needed):
-#   1. Open the repo on GitHub → Add file → Create new file
-#   2. Name it exactly:  .github/workflows/android-apk.yml
-#   3. Paste this file's content and commit to your branch
-#   4. Go to: Actions tab → "Build Android APK (debug)" → Run workflow
-#   5. When it goes green, open the run → Artifacts → download "app-debug-apk"
-#      → unzip → app-debug.apk is installable on any Android phone.
+# HOW TO UPDATE (2 minutes):
+#   1. Open the repo on GitHub → switch to branch `arena/01a101d2-pdf-app`
+#   2. Open `.github/workflows/android-apk.yml` → click the pencil (Edit) icon
+#   3. Select ALL existing content → delete → paste THIS file's content → Commit
+#   4. Actions → "Build Android APK (debug)" → Run workflow (branch: arena/01a101d2-pdf-app)
 #
-# (It lives in docs/ for now only because the bot token cannot create
-#  workflow files; any repo owner adding it via the web UI works instantly.)
+# What changed vs v1:
+#   - Explicit Android SDK setup + license accept + platforms 34/35/36 + build-tools
+#   - local.properties written explicitly (sdk.dir)
+#   - APK delivered TWO ways: run artifact AND a GitHub prerelease asset
+#     (release assets download from github.com = reachable everywhere)
+#   - On failure: gradle log tail uploaded as release asset for diagnosis
 
 name: Build Android APK (debug)
+
+permissions:
+  contents: write
 
 on:
   workflow_dispatch:
@@ -23,27 +28,64 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Java 17 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Android SDK setup
+        uses: android-actions/setup-android@v3
+
+      - name: SDK licenses + required packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0"
+
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Build debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Point Gradle at SDK
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
-      - name: Upload APK artifact
+      - name: Build debug APK (log captured)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-build.log
+
+      - name: Publish APK as prerelease asset
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -n 1)
+          echo "APK file: $APK"
+          TAG="apk-$(date +%Y%m%d-%H%M%S)"
+          gh release create "$TAG" "$APK" \
+            --title "APK build $TAG" \
+            --notes "Automated debug APK — branch arena/01a101d2-pdf-app" \
+            --prerelease
+          echo "APK_READY $TAG"
+
+      - name: Upload APK artifact (backup)
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+
+      - name: On failure, publish gradle log tail
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tail -n 400 /tmp/gradle-build.log > gradle-failure-log.txt || true
+          TAG="buildlog-$(date +%Y%m%d-%H%M%S)"
+          gh release create "$TAG" gradle-failure-log.txt \
+            --title "Build failure log $TAG" \
+            --notes "Gradle failure diagnostics" \
+            --prerelease || true
