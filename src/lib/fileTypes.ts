@@ -41,6 +41,24 @@ const codeExtensions = new Set([
   'lua',
   'r',
   'm',
+  'mjs',
+  'cjs',
+  'mts',
+  'cts',
+  'vue',
+  'svelte',
+  'astro',
+  'diff',
+  'patch',
+  'pl',
+  'pm',
+  'groovy',
+  'ino',
+  'bat',
+  'cmd',
+  'jsonl',
+  'ndjson',
+  'ipynb',
 ]);
 
 const textExtensions = new Set([
@@ -95,7 +113,7 @@ export function detectFileKind(name: string, mimeType?: string | null): FileKind
 
   if (ext === 'md' || ext === 'markdown' || mime === 'text/markdown') return 'markdown';
   if (ext === 'pdf' || mime === 'application/pdf') return 'pdf';
-  if (ext === 'docx' || mime.includes('officedocument.wordprocessingml') || mime === 'application/msword') return 'docx';
+  if (ext === 'docx' || ext === 'odt' || mime.includes('officedocument.wordprocessingml') || mime.includes('opendocument.text') || mime === 'application/msword') return 'docx';
   if (spreadsheetExtensions.has(ext) || mime.includes('spreadsheet') || mime.includes('excel')) return 'spreadsheet';
   if (presentationExtensions.has(ext) || mime.includes('presentation') || mime.includes('powerpoint')) return 'presentation';
   if (imageExtensions.has(ext) || mime.startsWith('image/')) return 'image';
@@ -205,11 +223,21 @@ export function getViewerHint(file: AppFile): string {
     case 'code':
       return 'Code preview/edit for small changes. Full IDE features are intentionally skipped.';
     case 'pdf':
-      return 'Drive-style PDF shell is ready. Native page rendering, search, and annotations are the next module.';
+      return 'Full-screen reader with scroll, pinch zoom, page indicator, and jump-to-page. Safe-copy tools live in Tools.';
     case 'docx':
-      return 'DOCX opens as document preview metadata first. Text extraction/rendering is the next module.';
+      return 'DOCX/ODT text opens extracted and selectable. Complex formatting renders simplified.';
     case 'image':
       return 'Image preview with zoom-style fit.';
+    case 'spreadsheet':
+      return 'XLSX/ODS sheets open as readable rows (tab-separated). Legacy .xls opens externally.';
+    case 'presentation':
+      return 'PPTX/ODP slides open as readable per-slide text. Legacy .ppt opens externally.';
+    case 'archive':
+      return 'ZIP-based archives (zip/apk/jar…) open as a Drive-style contents list.';
+    case 'audio':
+      return 'Audio plays in-app with Play/Pause.';
+    case 'video':
+      return 'Video plays in-app with system controls.';
     default:
       return 'Unsupported files still open here with metadata and actions.';
   }

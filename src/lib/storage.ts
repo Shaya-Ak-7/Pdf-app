@@ -8,6 +8,7 @@ import type { AppFile, RecentFile } from '../types';
 import { getNameFromUri, makeAppFile, toRecentFile } from './fileTypes';
 import { extractDocxText } from './docx';
 import { createDocxFromText } from './docxExport';
+import { extractOdtText, extractPresentationText, extractSpreadsheetText, listArchiveContents } from './office';
 
 const APP_DIR = `${FileSystem.documentDirectory ?? ''}file-tool/`;
 const NOTES_DIR = `${APP_DIR}notes/`;
@@ -59,9 +60,51 @@ export async function hydrateTextContent(file: AppFile): Promise<AppFile> {
       const textContent = await extractDocxText(file.uri);
       return { ...file, textContent };
     } catch (error) {
+      // ODT and other OpenDocument files share the docx kind; try the ODF reader.
+      try {
+        const textContent = await extractOdtText(file.uri);
+        return { ...file, textContent };
+      } catch {
+        return {
+          ...file,
+          readError: error instanceof Error ? error.message : 'Could not extract text from this document.',
+        };
+      }
+    }
+  }
+
+  if (file.kind === 'spreadsheet') {
+    try {
+      const textContent = await extractSpreadsheetText(file.uri);
+      return { ...file, textContent };
+    } catch (error) {
       return {
         ...file,
-        readError: error instanceof Error ? error.message : 'Could not extract text from this DOCX.',
+        readError: error instanceof Error ? error.message : 'Could not read this spreadsheet.',
+      };
+    }
+  }
+
+  if (file.kind === 'presentation') {
+    try {
+      const textContent = await extractPresentationText(file.uri);
+      return { ...file, textContent };
+    } catch (error) {
+      return {
+        ...file,
+        readError: error instanceof Error ? error.message : 'Could not read this presentation.',
+      };
+    }
+  }
+
+  if (file.kind === 'archive') {
+    try {
+      const textContent = await listArchiveContents(file.uri);
+      return { ...file, textContent };
+    } catch (error) {
+      return {
+        ...file,
+        readError: error instanceof Error ? error.message : 'Could not list this archive.',
       };
     }
   }

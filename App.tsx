@@ -44,6 +44,7 @@ import {
   makePreview,
 } from './src/lib/markdown';
 import { PdfPreview } from './src/components/PdfPreview';
+import { MediaPreview } from './src/components/MediaPreview';
 import {
   addHighlightToPdf,
   addTextStampToPdf,
@@ -871,6 +872,10 @@ function ReadSurface({ file, editorText, theme }: { file: AppFile; editorText: s
     return <PdfPreview file={file} theme={theme} />;
   }
 
+  if (file.kind === 'video' || file.kind === 'audio') {
+    return <MediaPreview file={file} theme={theme} />;
+  }
+
   if (file.kind === 'image') {
     return (
       <View style={[styles.readCanvas, { backgroundColor: theme.colors.background }]}> 
@@ -885,6 +890,18 @@ function ReadSurface({ file, editorText, theme }: { file: AppFile; editorText: s
         <ScrollView contentContainerStyle={styles.readPageWrap}>
           <View style={[styles.readPage, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
             <Text selectable style={[styles.readerText, { color: theme.colors.text }]}>{file.textContent}</Text>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if ((file.kind === 'spreadsheet' || file.kind === 'presentation' || file.kind === 'archive') && file.textContent) {
+    return (
+      <View style={[styles.readCanvas, { backgroundColor: theme.colors.background }]}> 
+        <ScrollView contentContainerStyle={styles.readPageWrap}>
+          <View style={[styles.readPage, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
+            <Text selectable style={[styles.readerText, styles.monoText, { color: theme.colors.text }]}>{file.textContent}</Text>
           </View>
         </ScrollView>
       </View>

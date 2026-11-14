@@ -30,7 +30,8 @@ After the latest work, full-app completion is closer to **60–65%**, not 70% ye
 - Clickable wiki-link/backlink chips when linked note exists in vault.
 - View-first Drive-style viewer (see `docs/DRIVE_PDF_VIEWER_ANALYSIS.md`): every intake source (system picker, Android "Open with"/share intents, recents, vault) opens files directly into a full-bleed read-only viewer. Editing and file tools are explicit app-bar actions, never the default surface.
 - Native PDF preview module for Android/iOS using `react-native-pdf`: full-height canvas, continuous scroll, pinch zoom (0.5x–4x), bottom bar with prev/next, live `x / y` page indicator, and jump-to-page input.
-- View-first readers: markdown → rendered preview; TXT → plain page reader; code → line-numbered highlighted reader; DOCX → extracted text on a page; image → contained full-bleed; unknown → metadata panel.
+- View-first readers: markdown → rendered preview; TXT → plain page reader; code → line-numbered highlighted reader; DOCX/ODT → extracted text on a page; XLSX/ODS → per-sheet tab-separated text; PPTX/ODP → per-slide text; ZIP-based archives (zip/apk/jar…) → Drive-style contents list; image → contained full-bleed; audio/video → in-app playback (expo-audio / expo-video on native, HTML5 elements on web); unknown → metadata panel.
+- V1 goal = universal viewer: every format opens directly into a read-only view (or graceful metadata/actions fallback) from any intake source. Editing remains behind the explicit Edit action and full editor polish is deferred to V2.
 - Web PDF preview fallback using iframe (browser-native Drive-like chrome).
 - PDF safe-copy tools using `pdf-lib`: add text to every page, highlight a page area, rotate page, extract page range, remove a page, move page to front/end, merge another PDF, and split pages to ZIP.
 - DOCX text extraction and simplified preview via DOCX XML parsing.
